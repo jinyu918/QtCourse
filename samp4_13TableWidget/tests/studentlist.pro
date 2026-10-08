@@ -1,0 +1,9 @@
+QT += widgets testlib
+CONFIG += c++11 testcase console
+TEMPLATE = app
+TARGET = tst_studentlist
+INCLUDEPATH += ..
+SOURCES += tst_studentlist.cpp ../mainwindow.cpp
+HEADERS += ../mainwindow.h
+FORMS += ../mainwindow.ui
+RESOURCES += ../res.qrc
