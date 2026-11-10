@@ -1,0 +1,9 @@
+build/
+build-*/
+*.pro.user*
+*.autosave
+~$*
+artifacts/
+local-materials/
+EXECUTION_PLAN.md
+实验2-简单文本编辑器_2026秋.docx
