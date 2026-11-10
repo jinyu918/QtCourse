@@ -8,6 +8,11 @@
 #include <QPushButton>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QClipboard>
+#include <QLabel>
+#include <QMimeData>
+#include <QToolBar>
+#include <QStatusBar>
 
 class EditorTest : public QObject
 {
@@ -19,6 +24,8 @@ private slots:
     void fileRoundTripAndSaveAs();
     void failedIoPreservesDocument();
     void closeCancelAndDiscard();
+    void editingActionStates();
+    void viewControlsAndStatus();
 
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;
@@ -60,6 +67,7 @@ void EditorTest::fileRoundTripAndSaveAs()
     QString error;
     QVERIFY2(window.saveFile(first, &error), qPrintable(error));
     QVERIFY(!window.isWindowModified());
+    QVERIFY(!window.findChild<QAction *>("actionSave")->isEnabled());
     MainWindow reopened;
     QVERIFY2(reopened.loadFile(first, &error), qPrintable(error));
     QCOMPARE(reopened.findChild<QPlainTextEdit *>("editor")->toPlainText(), text);
@@ -113,6 +121,56 @@ void EditorTest::closeCancelAndDiscard()
         box->button(QMessageBox::Discard)->click();
     });
     QVERIFY(window.close());
+}
+
+void EditorTest::editingActionStates()
+{
+    QApplication::clipboard()->clear();
+    MainWindow window;
+    auto *editor = window.findChild<QPlainTextEdit *>("editor");
+    const auto action = [&window](const char *name) { return window.findChild<QAction *>(name); };
+    QVERIFY(!action("actionUndo")->isEnabled());
+    QVERIFY(!action("actionRedo")->isEnabled());
+    QVERIFY(!action("actionCut")->isEnabled());
+    QVERIFY(!action("actionCopy")->isEnabled());
+    QVERIFY(!action("actionPaste")->isEnabled());
+    editor->insertPlainText("alpha beta");
+    QVERIFY(action("actionUndo")->isEnabled());
+    action("actionSelectAll")->trigger();
+    QVERIFY(action("actionCopy")->isEnabled());
+    action("actionCut")->trigger();
+    QCOMPARE(editor->toPlainText(), QString());
+    QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("alpha beta"));
+    QVERIFY(action("actionPaste")->isEnabled());
+    action("actionPaste")->trigger();
+    QCOMPARE(editor->toPlainText(), QStringLiteral("alpha beta"));
+    action("actionUndo")->trigger();
+    QVERIFY(editor->toPlainText().isEmpty());
+    QVERIFY(action("actionRedo")->isEnabled());
+    action("actionRedo")->trigger();
+    QCOMPARE(editor->toPlainText(), QStringLiteral("alpha beta"));
+    QApplication::clipboard()->setMimeData(new QMimeData);
+    QVERIFY(!action("actionPaste")->isEnabled());
+}
+
+void EditorTest::viewControlsAndStatus()
+{
+    MainWindow window;
+    auto *editor = window.findChild<QPlainTextEdit *>("editor");
+    window.findChild<QAction *>("actionWrap")->setChecked(false);
+    QCOMPARE(editor->lineWrapMode(), QPlainTextEdit::NoWrap);
+    window.findChild<QAction *>("actionWrap")->setChecked(true);
+    QCOMPARE(editor->lineWrapMode(), QPlainTextEdit::WidgetWidth);
+    window.findChild<QAction *>("actionToolbar")->setChecked(false);
+    QVERIFY(window.findChild<QToolBar *>("fileToolBar")->isHidden());
+    QVERIFY(window.findChild<QToolBar *>("formatToolBar")->isHidden());
+    window.findChild<QAction *>("actionToolbar")->setChecked(true);
+    QVERIFY(!window.findChild<QToolBar *>("fileToolBar")->isHidden());
+    window.findChild<QAction *>("actionStatusbar")->setChecked(false);
+    QVERIFY(window.statusBar()->isHidden());
+    editor->insertPlainText("one\ntwo");
+    QVERIFY(window.findChild<QLabel *>("statisticsLabel")->text().contains("7"));
+    QVERIFY(window.findChild<QLabel *>("positionLabel")->text().contains("2"));
 }
 
 QTEST_MAIN(EditorTest)

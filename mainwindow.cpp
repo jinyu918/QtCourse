@@ -9,6 +9,12 @@
 #include <QMessageBox>
 #include <QSaveFile>
 #include <QTextCodec>
+#include <QClipboard>
+#include <QColorDialog>
+#include <QFontDialog>
+#include <QLabel>
+#include <QSignalBlocker>
+#include <QStyle>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow)
@@ -19,6 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->editor->document(), &QTextDocument::modificationChanged,
             this, &MainWindow::updateTitle);
     updateTitle();
+    setUpEditing();
 }
 
 MainWindow::~MainWindow() = default;
@@ -80,6 +87,7 @@ void MainWindow::updateTitle()
     setWindowTitle(tr("%1[*] - 简单文本编辑器").arg(name));
     setWindowModified(ui->editor->document()->isModified());
     setWindowFilePath(currentPath);
+    updateActions();
 }
 
 void MainWindow::on_actionNew_triggered()
@@ -156,4 +164,99 @@ void MainWindow::on_actionClose_triggered()
 void MainWindow::on_actionExit_triggered()
 {
     QApplication::closeAllWindows();
+}
+
+void MainWindow::setUpEditing()
+{
+    connect(ui->actionUndo, &QAction::triggered, ui->editor, &QPlainTextEdit::undo);
+    connect(ui->actionRedo, &QAction::triggered, ui->editor, &QPlainTextEdit::redo);
+    connect(ui->actionCut, &QAction::triggered, ui->editor, &QPlainTextEdit::cut);
+    connect(ui->actionCopy, &QAction::triggered, ui->editor, &QPlainTextEdit::copy);
+    connect(ui->actionPaste, &QAction::triggered, ui->editor, &QPlainTextEdit::paste);
+    connect(ui->actionSelectAll, &QAction::triggered, ui->editor, &QPlainTextEdit::selectAll);
+    connect(ui->editor, &QPlainTextEdit::undoAvailable, this, &MainWindow::updateActions);
+    connect(ui->editor, &QPlainTextEdit::redoAvailable, this, &MainWindow::updateActions);
+    connect(ui->editor, &QPlainTextEdit::copyAvailable, this, &MainWindow::updateActions);
+    connect(ui->editor, &QPlainTextEdit::textChanged, this, &MainWindow::updateActions);
+    connect(QApplication::clipboard(), &QClipboard::dataChanged, this, &MainWindow::updateActions);
+
+    connect(ui->actionFont, &QAction::triggered, this, [this] {
+        bool accepted = false;
+        const QFont font = QFontDialog::getFont(&accepted, ui->editor->font(), this, tr("设置字体和字号"));
+        if (accepted) ui->editor->setFont(font);
+    });
+    connect(ui->actionTextColor, &QAction::triggered, this, [this] {
+        const QColor color = QColorDialog::getColor(ui->editor->palette().color(QPalette::Text),
+                                                    this, tr("设置字体颜色"));
+        if (!color.isValid()) return;
+        QPalette palette = ui->editor->palette();
+        palette.setColor(QPalette::Text, color);
+        ui->editor->setPalette(palette);
+    });
+    connect(ui->actionBackgroundColor, &QAction::triggered, this, [this] {
+        const QColor color = QColorDialog::getColor(ui->editor->palette().color(QPalette::Base),
+                                                    this, tr("设置编辑器背景颜色"));
+        if (!color.isValid()) return;
+        QPalette palette = ui->editor->palette();
+        palette.setColor(QPalette::Base, color);
+        ui->editor->setPalette(palette);
+    });
+    connect(ui->actionWrap, &QAction::toggled, this, [this](bool checked) {
+        ui->editor->setLineWrapMode(checked ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
+    });
+    connect(ui->actionToolbar, &QAction::toggled, this, [this](bool checked) {
+        ui->fileToolBar->setVisible(checked);
+        ui->formatToolBar->setVisible(checked);
+    });
+    const auto syncToolbarAction = [this] {
+        const QSignalBlocker blocker(ui->actionToolbar);
+        ui->actionToolbar->setChecked(!ui->fileToolBar->isHidden() || !ui->formatToolBar->isHidden());
+    };
+    connect(ui->fileToolBar, &QToolBar::visibilityChanged, this, syncToolbarAction);
+    connect(ui->formatToolBar, &QToolBar::visibilityChanged, this, syncToolbarAction);
+    connect(ui->actionStatusbar, &QAction::toggled, ui->statusbar, &QStatusBar::setVisible);
+
+    statisticsLabel = new QLabel(this);
+    statisticsLabel->setObjectName(QStringLiteral("statisticsLabel"));
+    positionLabel = new QLabel(this);
+    positionLabel->setObjectName(QStringLiteral("positionLabel"));
+    ui->statusbar->addPermanentWidget(statisticsLabel, 1);
+    ui->statusbar->addPermanentWidget(positionLabel);
+    ui->statusbar->addPermanentWidget(new QLabel(QStringLiteral("  UTF-8  "), this));
+    connect(ui->editor, &QPlainTextEdit::textChanged, this, &MainWindow::updateStatus);
+    connect(ui->editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateStatus);
+
+    ui->fileToolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    ui->formatToolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    ui->actionNew->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
+    ui->actionOpen->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
+    ui->actionSave->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
+    ui->actionUndo->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
+    ui->actionRedo->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
+    ui->actionFont->setIconText(tr("字体 / 字号"));
+    ui->actionTextColor->setIconText(tr("字体颜色"));
+    ui->actionBackgroundColor->setIconText(tr("背景颜色"));
+    updateActions();
+    updateStatus();
+}
+
+void MainWindow::updateActions()
+{
+    ui->actionUndo->setEnabled(ui->editor->document()->isUndoAvailable());
+    ui->actionRedo->setEnabled(ui->editor->document()->isRedoAvailable());
+    const bool selected = ui->editor->textCursor().hasSelection();
+    ui->actionCut->setEnabled(selected);
+    ui->actionCopy->setEnabled(selected);
+    ui->actionPaste->setEnabled(ui->editor->canPaste());
+    ui->actionSelectAll->setEnabled(!ui->editor->document()->isEmpty());
+    ui->actionSave->setEnabled(currentPath.isEmpty() || ui->editor->document()->isModified());
+}
+
+void MainWindow::updateStatus()
+{
+    const QTextCursor cursor = ui->editor->textCursor();
+    statisticsLabel->setText(tr("字符：%1    行数：%2").arg(
+        ui->editor->document()->characterCount() - 1).arg(ui->editor->blockCount()));
+    positionLabel->setText(tr("第 %1 行，第 %2 列    ").arg(
+        cursor.blockNumber() + 1).arg(cursor.positionInBlock() + 1));
 }

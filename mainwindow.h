@@ -5,6 +5,7 @@
 #include <memory>
 
 namespace Ui { class MainWindow; }
+class QLabel;
 
 class MainWindow : public QMainWindow
 {
@@ -32,8 +33,13 @@ private slots:
 private:
     std::unique_ptr<Ui::MainWindow> ui;
     QString currentPath;
+    QLabel *statisticsLabel;
+    QLabel *positionLabel;
     bool maybeSave();
     void updateTitle();
+    void updateActions();
+    void updateStatus();
+    void setUpEditing();
 };
 
 #endif
