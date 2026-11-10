@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AboutDialog</class>
+ <widget class="QDialog" name="AboutDialog">
+  <property name="windowTitle"><string>关于简单文本编辑器</string></property>
+  <property name="minimumSize"><size><width>390</width><height>230</height></size></property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing"><number>16</number></property>
+   <item><widget class="QLabel" name="titleLabel"><property name="font"><font><pointsize>16</pointsize><bold>true</bold></font></property><property name="text"><string>简单文本编辑器</string></property></widget></item>
+   <item><widget class="QLabel" name="descriptionLabel"><property name="text"><string>Qt 应用程序开发 · 实验二
+
+基于 Qt Widgets 的多窗口纯文本编辑器。
+支持 UTF-8 文件、查找替换、行号和编辑外观设置。
+字体和颜色仅影响显示，不写入纯文本文件。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Ok</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections><connection><sender>buttonBox</sender><signal>accepted()</signal><receiver>AboutDialog</receiver><slot>accept()</slot><hints><hint type="sourcelabel"><x>0</x><y>0</y></hint><hint type="destinationlabel"><x>0</x><y>0</y></hint></hints></connection></connections>
+</ui>

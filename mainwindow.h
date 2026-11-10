@@ -6,6 +6,7 @@
 
 namespace Ui { class MainWindow; }
 class QLabel;
+class SearchDialog;
 
 class MainWindow : public QMainWindow
 {
@@ -29,17 +30,23 @@ private slots:
     bool on_actionSaveAs_triggered();
     void on_actionClose_triggered();
     void on_actionExit_triggered();
+    void on_actionFind_triggered();
+    void on_actionReplace_triggered();
+    void on_actionAbout_triggered();
 
 private:
     std::unique_ptr<Ui::MainWindow> ui;
     QString currentPath;
     QLabel *statisticsLabel;
     QLabel *positionLabel;
+    SearchDialog *findDialog = nullptr;
+    SearchDialog *replaceDialog = nullptr;
     bool maybeSave();
     void updateTitle();
     void updateActions();
     void updateStatus();
     void setUpEditing();
+    void showSearch(bool replaceMode);
 };
 
 #endif

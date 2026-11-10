@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SearchDialog</class>
+ <widget class="QDialog" name="SearchDialog">
+  <property name="windowTitle"><string>查找和替换</string></property>
+  <property name="minimumSize"><size><width>460</width><height>200</height></size></property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item><layout class="QFormLayout" name="formLayout">
+    <item row="0" column="0"><widget class="QLabel" name="searchLabel"><property name="text"><string>查找内容(&amp;F)：</string></property><property name="buddy"><cstring>searchEdit</cstring></property></widget></item>
+    <item row="0" column="1"><widget class="QLineEdit" name="searchEdit"/></item>
+    <item row="1" column="0"><widget class="QLabel" name="replaceLabel"><property name="text"><string>替换为(&amp;R)：</string></property><property name="buddy"><cstring>replaceEdit</cstring></property></widget></item>
+    <item row="1" column="1"><widget class="QLineEdit" name="replaceEdit"/></item>
+   </layout></item>
+   <item><layout class="QHBoxLayout" name="optionsLayout">
+    <item><widget class="QCheckBox" name="caseCheck"><property name="text"><string>区分大小写(&amp;C)</string></property></widget></item>
+    <item><widget class="QCheckBox" name="wholeWordCheck"><property name="text"><string>全词匹配(&amp;W)</string></property></widget></item>
+   </layout></item>
+   <item><widget class="QLabel" name="feedbackLabel"><property name="text"><string>请输入查找内容</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><layout class="QHBoxLayout" name="buttonsLayout">
+    <item><widget class="QPushButton" name="findButton"><property name="text"><string>查找下一个(&amp;N)</string></property><property name="default"><bool>true</bool></property></widget></item>
+    <item><widget class="QPushButton" name="replaceButton"><property name="text"><string>替换(&amp;P)</string></property></widget></item>
+    <item><widget class="QPushButton" name="replaceAllButton"><property name="text"><string>全部替换(&amp;A)</string></property></widget></item>
+    <item><widget class="QPushButton" name="closeButton"><property name="text"><string>关闭</string></property></widget></item>
+   </layout></item>
+  </layout>
+ </widget>
+ <tabstops><tabstop>searchEdit</tabstop><tabstop>replaceEdit</tabstop><tabstop>caseCheck</tabstop><tabstop>wholeWordCheck</tabstop><tabstop>findButton</tabstop><tabstop>replaceButton</tabstop><tabstop>replaceAllButton</tabstop><tabstop>closeButton</tabstop></tabstops>
+ <resources/>
+ <connections/>
+</ui>

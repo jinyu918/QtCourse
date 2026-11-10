@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "searchdialog.h"
 
 #include <QAction>
 #include <QPlainTextEdit>
@@ -13,6 +14,8 @@
 #include <QMimeData>
 #include <QToolBar>
 #include <QStatusBar>
+#include <QLineEdit>
+#include <QCheckBox>
 
 class EditorTest : public QObject
 {
@@ -26,6 +29,9 @@ private slots:
     void closeCancelAndDiscard();
     void editingActionStates();
     void viewControlsAndStatus();
+    void findWrapAndMissing();
+    void replaceAllBoundaries();
+    void replaceWholeWordAndCase();
 
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;
@@ -171,6 +177,79 @@ void EditorTest::viewControlsAndStatus()
     editor->insertPlainText("one\ntwo");
     QVERIFY(window.findChild<QLabel *>("statisticsLabel")->text().contains("7"));
     QVERIFY(window.findChild<QLabel *>("positionLabel")->text().contains("2"));
+}
+
+void EditorTest::findWrapAndMissing()
+{
+    MainWindow window;
+    auto *editor = window.findChild<QPlainTextEdit *>("editor");
+    editor->setPlainText("cat dog cat");
+    editor->moveCursor(QTextCursor::Start);
+    window.findChild<QAction *>("actionFind")->trigger();
+    auto *dialog = window.findChild<SearchDialog *>("findDialog");
+    QVERIFY(dialog);
+    auto *search = dialog->findChild<QLineEdit *>("searchEdit");
+    auto *next = dialog->findChild<QPushButton *>("findButton");
+    QVERIFY(!next->isEnabled());
+    search->setText("cat");
+    next->click();
+    QCOMPARE(editor->textCursor().selectionStart(), 0);
+    next->click();
+    QCOMPARE(editor->textCursor().selectionStart(), 8);
+    next->click();
+    QCOMPARE(editor->textCursor().selectionStart(), 0);
+    search->setText("absent");
+    next->click();
+    QVERIFY(dialog->findChild<QLabel *>("feedbackLabel")->text().contains(QStringLiteral("未找到")));
+    QCOMPARE(editor->textCursor().selectionStart(), 0);
+}
+
+void EditorTest::replaceAllBoundaries()
+{
+    MainWindow window;
+    auto *editor = window.findChild<QPlainTextEdit *>("editor");
+    editor->setPlainText("a a");
+    window.findChild<QAction *>("actionReplace")->trigger();
+    auto *dialog = window.findChild<SearchDialog *>("replaceDialog");
+    auto *search = dialog->findChild<QLineEdit *>("searchEdit");
+    auto *replacement = dialog->findChild<QLineEdit *>("replaceEdit");
+    auto *all = dialog->findChild<QPushButton *>("replaceAllButton");
+    search->setText("a");
+    replacement->setText("aa");
+    all->click();
+    QCOMPARE(editor->toPlainText(), QStringLiteral("aa aa"));
+    QVERIFY(dialog->findChild<QLabel *>("feedbackLabel")->text().contains("2"));
+    editor->undo();
+    QCOMPARE(editor->toPlainText(), QStringLiteral("a a"));
+    replacement->clear();
+    all->click();
+    QCOMPARE(editor->toPlainText(), QStringLiteral(" "));
+    editor->undo();
+    QCOMPARE(editor->toPlainText(), QStringLiteral("a a"));
+    replacement->setText("a");
+    all->click();
+    QCOMPARE(editor->toPlainText(), QStringLiteral("a a"));
+    search->clear();
+    QVERIFY(!all->isEnabled());
+}
+
+void EditorTest::replaceWholeWordAndCase()
+{
+    MainWindow window;
+    auto *editor = window.findChild<QPlainTextEdit *>("editor");
+    editor->setPlainText("cat scatter Cat cat");
+    window.findChild<QAction *>("actionReplace")->trigger();
+    auto *dialog = window.findChild<SearchDialog *>("replaceDialog");
+    dialog->findChild<QLineEdit *>("searchEdit")->setText("cat");
+    dialog->findChild<QLineEdit *>("replaceEdit")->setText("dog");
+    dialog->findChild<QCheckBox *>("caseCheck")->setChecked(true);
+    dialog->findChild<QCheckBox *>("wholeWordCheck")->setChecked(true);
+    editor->moveCursor(QTextCursor::Start);
+    dialog->findChild<QPushButton *>("findButton")->click();
+    dialog->findChild<QPushButton *>("replaceButton")->click();
+    QCOMPARE(editor->toPlainText(), QStringLiteral("dog scatter Cat cat"));
+    dialog->findChild<QPushButton *>("replaceAllButton")->click();
+    QCOMPARE(editor->toPlainText(), QStringLiteral("dog scatter Cat dog"));
 }
 
 QTEST_MAIN(EditorTest)

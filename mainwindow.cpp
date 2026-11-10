@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "ui_aboutdialog.h"
+#include "searchdialog.h"
 
 #include <QApplication>
 #include <QCloseEvent>
@@ -259,4 +261,37 @@ void MainWindow::updateStatus()
         ui->editor->document()->characterCount() - 1).arg(ui->editor->blockCount()));
     positionLabel->setText(tr("第 %1 行，第 %2 列    ").arg(
         cursor.blockNumber() + 1).arg(cursor.positionInBlock() + 1));
+}
+
+void MainWindow::showSearch(bool replaceMode)
+{
+    SearchDialog *&dialog = replaceMode ? replaceDialog : findDialog;
+    if (!dialog) {
+        dialog = new SearchDialog(ui->editor, replaceMode, this);
+        dialog->setObjectName(replaceMode ? QStringLiteral("replaceDialog") : QStringLiteral("findDialog"));
+    }
+    const QString selected = ui->editor->textCursor().selectedText();
+    if (!selected.isEmpty() && !selected.contains(QChar::ParagraphSeparator))
+        dialog->setSearchText(selected);
+    dialog->show();
+    dialog->raise();
+    dialog->activateWindow();
+}
+
+void MainWindow::on_actionFind_triggered()
+{
+    showSearch(false);
+}
+
+void MainWindow::on_actionReplace_triggered()
+{
+    showSearch(true);
+}
+
+void MainWindow::on_actionAbout_triggered()
+{
+    QDialog dialog(this);
+    Ui::AboutDialog about;
+    about.setupUi(&dialog);
+    dialog.exec();
 }
