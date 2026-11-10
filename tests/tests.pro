@@ -1,0 +1,9 @@
+QT += core gui widgets testlib
+CONFIG += c++11 testcase console
+CONFIG -= app_bundle
+TARGET = editor_tests
+TEMPLATE = app
+INCLUDEPATH += ..
+SOURCES += tst_editor.cpp ../mainwindow.cpp
+HEADERS += ../mainwindow.h
+FORMS += ../mainwindow.ui
