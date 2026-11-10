@@ -206,6 +206,7 @@ void MainWindow::setUpEditing()
     connect(ui->actionWrap, &QAction::toggled, this, [this](bool checked) {
         ui->editor->setLineWrapMode(checked ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
     });
+    connect(ui->actionLineNumbers, &QAction::toggled, ui->editor, &CodeEditor::setLineNumbersVisible);
     connect(ui->actionToolbar, &QAction::toggled, this, [this](bool checked) {
         ui->fileToolBar->setVisible(checked);
         ui->formatToolBar->setVisible(checked);

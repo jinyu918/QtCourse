@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "searchdialog.h"
+#include "codeeditor.h"
 
 #include <QAction>
 #include <QPlainTextEdit>
@@ -16,6 +17,11 @@
 #include <QStatusBar>
 #include <QLineEdit>
 #include <QCheckBox>
+#include <QFileDialog>
+#include <QPointer>
+#include <QScrollBar>
+#include <QFontDialog>
+#include <QColorDialog>
 
 class EditorTest : public QObject
 {
@@ -32,6 +38,10 @@ private slots:
     void findWrapAndMissing();
     void replaceAllBoundaries();
     void replaceWholeWordAndCase();
+    void lineNumbersAndScrolling();
+    void newWindowIsIndependent();
+    void closeSaveAndCancelSaveAs();
+    void appearanceDialogs();
 
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;
@@ -40,6 +50,7 @@ protected:
 void EditorTest::initTestCase()
 {
     qApp->installEventFilter(this);
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
 }
 
 bool EditorTest::eventFilter(QObject *object, QEvent *event)
@@ -250,6 +261,135 @@ void EditorTest::replaceWholeWordAndCase()
     QCOMPARE(editor->toPlainText(), QStringLiteral("dog scatter Cat cat"));
     dialog->findChild<QPushButton *>("replaceAllButton")->click();
     QCOMPARE(editor->toPlainText(), QStringLiteral("dog scatter Cat dog"));
+}
+
+void EditorTest::lineNumbersAndScrolling()
+{
+    MainWindow window;
+    window.resize(620, 300);
+    window.show();
+    auto *editor = window.findChild<CodeEditor *>("editor");
+    QVERIFY(editor);
+    const int narrow = editor->lineNumberAreaWidth();
+    QStringList lines;
+    for (int i = 1; i <= 150; ++i) lines << QString::number(i) + QString(120, QLatin1Char('x'));
+    editor->setPlainText(lines.join(QLatin1Char('\n')));
+    QVERIFY(editor->lineNumberAreaWidth() > narrow);
+    QCOMPARE(editor->blockCount(), 150);
+    auto *gutter = editor->findChild<QWidget *>("lineNumberArea");
+    QVERIFY(gutter->isVisible());
+    const int leftWithNumbers = editor->viewport()->geometry().left();
+    window.findChild<QAction *>("actionLineNumbers")->setChecked(false);
+    QVERIFY(!editor->lineNumbersVisible());
+    QVERIFY(gutter->isHidden());
+    QVERIFY(editor->viewport()->geometry().left() < leftWithNumbers);
+    window.findChild<QAction *>("actionLineNumbers")->setChecked(true);
+    QCOMPARE(editor->viewport()->geometry().left(), leftWithNumbers);
+    editor->moveCursor(QTextCursor::End);
+    editor->ensureCursorVisible();
+    QVERIFY(editor->verticalScrollBar()->value() > 0);
+    QVERIFY(!gutter->grab().isNull());
+    window.findChild<QAction *>("actionWrap")->setChecked(false);
+    QVERIFY(editor->horizontalScrollBar()->maximum() > 0);
+    editor->document()->setModified(false);
+}
+
+void EditorTest::newWindowIsIndependent()
+{
+    QTemporaryDir directory;
+    MainWindow first;
+    auto *firstEditor = first.findChild<CodeEditor *>("editor");
+    firstEditor->insertPlainText("first");
+    first.findChild<QAction *>("actionNew")->trigger();
+    QPointer<MainWindow> second;
+    for (QWidget *widget : QApplication::topLevelWidgets()) {
+        auto *candidate = qobject_cast<MainWindow *>(widget);
+        if (candidate && candidate != &first) second = candidate;
+    }
+    QVERIFY(second);
+    auto *secondEditor = second->findChild<CodeEditor *>("editor");
+    QVERIFY(secondEditor->toPlainText().isEmpty());
+    secondEditor->insertPlainText("second");
+    QVERIFY(second->saveFile(directory.filePath("second.txt")));
+    QVERIFY(first.filePath().isEmpty());
+    QVERIFY(first.isWindowModified());
+    QCOMPARE(firstEditor->toPlainText(), QStringLiteral("first"));
+    first.findChild<QAction *>("actionWrap")->setChecked(false);
+    QCOMPARE(secondEditor->lineWrapMode(), QPlainTextEdit::WidgetWidth);
+    QVERIFY(second->close());
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QVERIFY(second.isNull());
+}
+
+void EditorTest::closeSaveAndCancelSaveAs()
+{
+    QTemporaryDir directory;
+    MainWindow saved;
+    auto *editor = saved.findChild<CodeEditor *>("editor");
+    QVERIFY(saved.saveFile(directory.filePath("saved.txt")));
+    editor->insertPlainText("saved on close");
+    saved.show();
+    QTimer::singleShot(50, [] {
+        auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+        QVERIFY(box);
+        box->button(QMessageBox::Save)->click();
+    });
+    QVERIFY(saved.close());
+    QFile file(saved.filePath());
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QCOMPARE(file.readAll(), QByteArray("saved on close"));
+
+    MainWindow unnamed;
+    unnamed.findChild<CodeEditor *>("editor")->insertPlainText("keep me");
+    unnamed.show();
+    QTimer::singleShot(50, [] {
+        auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+        QVERIFY(box);
+        QTimer::singleShot(100, [] {
+            auto *dialog = qobject_cast<QFileDialog *>(QApplication::activeModalWidget());
+            QVERIFY(dialog);
+            dialog->reject();
+        });
+        box->button(QMessageBox::Save)->click();
+    });
+    QVERIFY(!unnamed.close());
+    QVERIFY(unnamed.isVisible());
+    QVERIFY(unnamed.filePath().isEmpty());
+    QCOMPARE(unnamed.findChild<CodeEditor *>("editor")->toPlainText(), QStringLiteral("keep me"));
+    unnamed.findChild<CodeEditor *>("editor")->document()->setModified(false);
+}
+
+void EditorTest::appearanceDialogs()
+{
+    MainWindow window;
+    auto *editor = window.findChild<CodeEditor *>("editor");
+    QTimer::singleShot(50, [] {
+        auto *dialog = qobject_cast<QFontDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        QFont font = dialog->currentFont();
+        font.setPointSize(18);
+        dialog->setCurrentFont(font);
+        dialog->accept();
+    });
+    window.findChild<QAction *>("actionFont")->trigger();
+    QCOMPARE(editor->font().pointSize(), 18);
+    QTimer::singleShot(50, [] {
+        auto *dialog = qobject_cast<QColorDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        dialog->setCurrentColor(QColor("#123456"));
+        dialog->accept();
+    });
+    window.findChild<QAction *>("actionTextColor")->trigger();
+    QCOMPARE(editor->palette().color(QPalette::Text), QColor("#123456"));
+    QTimer::singleShot(50, [] {
+        auto *dialog = qobject_cast<QColorDialog *>(QApplication::activeModalWidget());
+        QVERIFY(dialog);
+        dialog->setCurrentColor(QColor("#fff4d6"));
+        dialog->accept();
+    });
+    window.findChild<QAction *>("actionBackgroundColor")->trigger();
+    QCOMPARE(editor->palette().color(QPalette::Base), QColor("#fff4d6"));
+    QVERIFY(!editor->document()->isModified());
 }
 
 QTEST_MAIN(EditorTest)
